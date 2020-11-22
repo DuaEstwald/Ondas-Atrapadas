@@ -1,4 +1,4 @@
-# Este script ha sido el codigo utilizado para resolver
+# Este script contiene el codigo utilizado para resolver
 # la primera practica de la asignatura de Fisica Solar y Clima Espacial
 
 # Autora: Elena Arjona Galvez
@@ -10,11 +10,20 @@ from scipy import interpolate
 import matplotlib.pyplot as plt
 
 
+
+# ==========================================
+# ====== CAMBIO DE UNIDADES ================
+# ==========================================
+
 gtokg = 1e-3
 cmtom = 1e-2
 kmtom = 1e3
 cmtokm = 1e-5
 
+
+# ==========================================
+# ==== LEEMOS EL MODELO SOLAR ==============
+# ==========================================
 
 fil = 'model_jcd.dat'
 model = np.loadtxt(fil,comments = '#')
@@ -27,11 +36,19 @@ T_m     = model[:,3] # [K]
 gamma = 5./3.
 g = 274.*1e-3 # [km/s2]
 
+# ========================================
+# == CALCULAMOS LOS PARAMETROS ===========
+# ========================================
 
 cs2_m = gamma*P_m/rho_m #[km2 / s2]
 wc2_m = ((gamma*g)**2.)/(4.*cs2_m) #(km2/s4)/(km2/s2) = [s-2]
 N2_m = g*(gamma - 1)/(gamma * (cs2_m/(gamma*g)))
 
+# ========================================
+# === REALIZAMOS LAS DERIVADAS EN Z ======
+# ========================================
+
+# Para el calculo de las derivadas se ha usado un metodo de elementos finitos.
 
 def centered(f,h):
     dh = (h[-1]-h[0])/h.shape[0]
@@ -155,17 +172,13 @@ def RungeKutta4th(k_z,x,z,fz,fkx,fkz,ds,mode):
 # ======= CONDICIONES INICIALES ================
 # ==============================================
 
-
+# FRECUENCIA DE LA ONDA
 w = 2.5e-3 * (2.*np.pi)
 
-
-
-
-# PARAMETROS PORSIACASO
+# PROFUNDIDAD DE CORTE
 zc = zint(w**2.)
-#k_z2 = ((w**2.-wc2_m)/cs2_m) + (k_x**2./w**2.)*(N2_m - w**2.)
-#kz2int = interpolate.interp1d(z_m,k_z2)
-#
+
+# ESTABLECEMOS DISTINTAS PROFUNDIDADES INICIALES
 zinit = np.array([0.5, 1.0, 2.0,5.0,10.0, 15.0])
 
 
@@ -178,8 +191,10 @@ colors = plt.cm.viridis(np.linspace(0,1,len(zinit)))
 ax1.axis('equal')
 
 
-
-
+# ==============================================
+# ===== DIAGRAMA K-W ===========================
+# ==============================================
+# Esto nos servira para calcular el diagrama k-w
 kx2_c = (w**2.)*(w**2. - wc2_m)/(cs2_m*(w**2. - N2_m))
 H = P_m/(g*rho_m)
 Hint = interpolate.interp1d(z_m,H)
@@ -189,33 +204,40 @@ ax2.plot(2*H*(kx2_c**0.5),w/(wc2_m**0.5),'k')
 ax2.plot(2.*H*(kx2_c**0.5),(N2_m/wc2_m)**0.5,'--k')
 ax2.plot(2.*H*(kx2_c**0.5),(cs2_m**0.5)*(kx2_c**0.5)/(wc2_m**0.5),'--k')
 
+# ================================================
 
 
+# ================================================
+# =========== INTEGRACION ========================
+# ================================================
 
+# Se realiza un for para el calculo de la integracion a distintas profundidades iniciales fijadas anteriormente.
+# La profundidad inicial vendra dada por zc - abs(zc)*zinit
 c = 0
 for z0 in zc - abs(zc)*zinit:
 
-    ds = 1.
-    s = np.arange(0.,50000+ds,ds)
+    ds = 1. # Marcamos el paso de integracion a 1 km
+    s = np.arange(0.,50000+ds,ds) # Creamos un array de la trayectoria para la integracion
 
     xs = np.ones(s.shape[0])
-    xs[0] = 0.0
+    xs[0] = 0.0 # Establecemos la condicion inicial para x
     zs = np.ones(s.shape[0])
-    zs[0] = z0 
+    zs[0] = z0  # Establecemos la condicion inicial para z
 
 
-    k_x = w/(cs2int(z0)**0.5)
+    k_x = w/(cs2int(z0)**0.5) # Calculamos la kx correspondiente a la profundidad inicial
     print(k_x)
-    #kx = ((w**2./csint(z0)**2.)*(w**2. - wcint(z0)**2.)/(w**2. - Nint(z0)**2.))**0.5
-
     kx = np.ones(s.shape[0])*k_x
     kz = np.ones(s.shape[0])
-    kz[0] = 0.
+    kz[0] = 0. # Establecemos la condicion inicial para kz
 
-
+# INICIO DE LA INTEGRACION
     for i in range(s.shape[0]-1):
 
-        # (k_z,x,z,fz,fkx,fkz,ds,mode)
+        # (k_z,x,z,fz,fkx,fkz,ds,mode) son los parametros necesarios para el Runge-Kutta
+        
+        # Con el parametro "mode" se escoje si queremos realizar la trayectoria de la onda rapida o lenta.
+
         kz[i+1], xs[i+1], zs[i+1] = \
                 RungeKutta4th(kz[i],xs[i],zs[i],dFz,dFkx,dFkz,ds,'fast')
 
